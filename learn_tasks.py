@@ -18,36 +18,27 @@ def smart_parallel_learn(agi_name,fid_to_correct,task):
     return {"fid_to_correct": fid_to_correct, "task": task}
 
 def create_agi(tasks, agi_name):
-
     brain = Mind(agi_name)
-    
-    
-    for i, task in enumerate(tasks, start=1):
-        
+
+    all_jobs = []
+
+    for task in tasks:
         fid, contradictions = brain.learn(task)
 
-        # print("\n" + "=" * 60)
-        # print(f"Task {i}: {task}")
-        # print(f"Learned with ID: {fid}")
-        # print(f"Contradictions: {contradictions}")
-
-        # Resolve contradictions if any
         if contradictions:
-            # print("Resolving contradictions...")
-            results = [{"agi_name": agi_name, "fid_to_correct": contradiction.get("id"), "task": task} for contradiction in contradictions]
-            # pprint(f"Results to correct: {results}")
-            with WorkerPool(n_jobs=num_cores,daemon=False) as pool:
-                results = pool.map(smart_parallel_learn, results, progress_bar=False)
+            all_jobs.extend(
+                {
+                    "agi_name": agi_name,
+                    "fid_to_correct": c["id"],
+                    "task": task,
+                }
+                for c in contradictions
+            )
 
-
-
-        # Recall after learning
-        results = brain.recall(task)
-        # print(f"Recall: {results}")
-
+    with WorkerPool(n_jobs=num_cores, daemon=False) as pool:
+        pool.map(smart_parallel_learn, all_jobs)
 
     return brain
-
 
 def ask_agi(brain, query):
     correct_response = brain.recall(query)
